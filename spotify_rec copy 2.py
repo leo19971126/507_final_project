@@ -5,7 +5,7 @@ import networkx as nx
 from spotipy.oauth2 import SpotifyClientCredentials
 import networkx as nx
 import matplotlib.pyplot as plt
-
+from sklearn.cluster import KMeans
 
 # link to api_key.py file
 from client_credential import client_id, client_secret
@@ -24,6 +24,7 @@ def get_data(genres, artists, songs):
 
     # Gather data on popular songs and artists that match the user's preferences
     tracks = []
+    print(tracks)
     for genre in genres:
         results = sp.search(q='genre:' + genre, type='track')
         tracks.extend(results['tracks']['items'])
@@ -56,8 +57,7 @@ def create_graph(data):
     # Add nodes to the graph representing each song
     for item in data:
         track = item['track']
-        G.add_node(track['id'], name=track['name'], artist=track['artists'][0]['name'])
-
+        G.add_node(track['id'], name=track['name'], artist=track['artists'][0]['name'], album=track['album']['name'])
     # Connect nodes based on their similarity in terms of audio features
     for i in range(len(data)):
         for j in range(i+1, len(data)):
@@ -76,10 +76,69 @@ def create_graph(data):
                 similarity += 1
 
             # Add an edge between the nodes if their similarity score is above a certain threshold
-            if similarity >= 2:
+            if similarity >= 1:
                 G.add_edge(track1['id'], track2['id'], weight=similarity)
 
     return G
+
+def cluster_graph(G):
+    # Cluster the nodes of the graph into different groups based on their similarity
+    # Use the KMeans algorithm from sklearn library
+    # Convert the graph into a matrix of edge weights
+    A = nx.to_numpy_matrix(G)
+    # Choose the number of clusters (k) based on some criteria (e.g. elbow method)
+    k = 3 # For simplicity, assume k = 3
+    # Create a KMeans object with k clusters
+    kmeans = KMeans(n_clusters=k)
+    # Fit the matrix to the KMeans object
+    kmeans.fit(A)
+    # Get the labels of each node (which cluster they belong to)
+    labels = kmeans.labels_
+    # Assign the labels as an attribute to each node in the graph
+    for i, node in enumerate(G.nodes()):
+        G.nodes[node]['cluster'] = labels[i]
+    return G
+
+def recommend_song(G, song_id, same_cluster=True):
+    # Recommend another song from the graph based on a given song id and a preference
+    # If same_cluster is True, recommend a song from the same cluster as the given song
+    # If same_cluster is False, recommend a song from a different cluster than the given song
+    # Get the name, artist, album, and cluster of the given song
+    name = G.nodes[song_id]['name']
+    artist = G.nodes[song_id]['artist']
+    album = G.nodes[song_id]['album']
+    cluster = G.nodes[song_id]['cluster']
+    print(f"You chose {name} by {artist} from {album}.")
+    # Get the list of neighbors of the given song (songs that are connected by an edge)
+    neighbors = list(G.neighbors(song_id))
+    # Filter the neighbors by their cluster attribute
+    if same_cluster:
+        # Keep only the neighbors that have the same cluster as the given song
+        neighbors = [n for n in neighbors if G.nodes[n]['cluster'] == cluster]
+        print(f"Here are some songs from the same cluster that you might like:")
+    else:
+        # Keep only the neighbors that have a different cluster than the given song
+        neighbors = [n for n in neighbors if G.nodes[n]['cluster'] != cluster]
+        print(f"Here are some songs from a different cluster that you might find interesting:")
+    # If there are no neighbors left after filtering, print a message and return None
+    if not neighbors:
+        print(f"Sorry, there are no songs that match your preference.")
+        return None
+    # Otherwise, choose a random neighbor from the list and print its name, artist, and album
+    import random
+    choice = random.choice(neighbors)
+    choice_name = G.nodes[choice]['name']
+    choice_artist = G.nodes[choice]['artist']
+    choice_album = G.nodes[choice]['album']
+    print(f"We recommend {choice_name} by {choice_artist} from {choice_album}.")
+
+def visualize_graph(G):
+    # Draw the graph
+    pos = nx.spring_layout(G)
+    nx.draw_networkx(G, with_labels=True)
+
+    # Show the plot
+    plt.show()
 
 def get_recommendations(G, artists, songs):
     # Analyze the user's input and generate a playlist of recommended songs using the graph-based algorithm
@@ -89,16 +148,29 @@ def get_recommendations(G, artists, songs):
     for artist in artists:
         for node in G.nodes(data=True):
             if node[1]['artist'] == artist:
+                # Add the node to the playlist
+                playlist.append((node[1]['name'], node[1]['artist'], node[1]['album']))
+                # Get the neighbors of the node
                 neighbors = G.neighbors(node[0])
-                for neighbor in neighbors:
-                    playlist.append(G.nodes[neighbor]['name'])
+                # Sort the neighbors by their edge weight and add them to the playlist
+                sorted_neighbors = sorted(neighbors, key=lambda x: G[node[0]][x]['weight'], reverse=True)
+                for neighbor in sorted_neighbors[:20]:
+                    playlist.append((G.nodes[neighbor]['name'], G.nodes[neighbor]['artist'], G.nodes[neighbor]['album']))
 
     for song in songs:
         for node in G.nodes(data=True):
             if node[1]['name'] == song:
+                # Add the node to the playlist
+                playlist.append((node[1]['name'], node[1]['artist'], node[1]['album']))
+                # Get the neighbors of the node
                 neighbors = G.neighbors(node[0])
-                for neighbor in neighbors:
-                    playlist.append(G.nodes[neighbor]['name'])
+                # Sort the neighbors by their edge weight and add them to the playlist
+                sorted_neighbors = sorted(neighbors, key=lambda x: G[node[0]][x]['weight'], reverse=True)
+                for neighbor in sorted_neighbors[:20]:
+                    playlist.append((G.nodes[neighbor]['name'], G.nodes[neighbor]['artist'], G.nodes[neighbor]['album']))
+
+    # Remove duplicate songs from the playlist and keep only the top 20 songs
+    playlist = list(dict.fromkeys(playlist))[:20]
 
     return playlist
 
@@ -109,33 +181,16 @@ def main():
     artists = ['Taylor Swift']
     songs = ['Death of a Bachelor']
     data = get_data(genres, artists, songs)
+    print(get_data(genres, artists, songs))
     g = create_graph(data)
+    g = cluster_graph(g)
     # visualize_graph(g)
     playlist = get_recommendations(g, artists, songs)
-    print(playlist)
-    # results = gather_data('Radiohead', 'Creep')
-    # print(results[0]['id'])
-    # print(create_graph1(client_id, client_secret))
-    # print(results)
-    # print(gather_audio_features([results[0]['id']]))
-    # print(create_graph(results, gather_audio_features([results[0]['id']])))
-    # print(generate_playlist(create_graph(results, gather_audio_features([results[0]['id']]))))
-#     genres = input('Enter your preferred genres (comma-separated): ')
-#     artists = input('Enter your preferred artists (comma-separated): ')
-#     songs = input('Enter your preferred songs (comma-separated): ')
-#     tracks = gather_data(genres, artists, songs)
-#     track_ids = [track['id'] for track in tracks]
-#     features = gather_audio_features(track_ids)
-#     graph = create_graph(tracks, features)
-#     playlist = generate_playlist(graph)
-#     feedback = get_user_feedback(playlist)
-#     while 's' in feedback:
-#         playlist = generate_playlist(graph)
-#         feedback = get_user_feedback(playlist)
-#     print('Playlist generated successfully!')
-#     for i, song in enumerate(playlist):
-#         if feedback[i] == 'y':
-#             print(f"{i+1}. {song['name']} - {song['artist']} ({song['album']} - {song['release_year']})")
+    # print(recommend_song(g, '3Qm86XLflmIXVm1wcwkgDK', same_cluster=True))
+    print('Recommended songs:')
+    for song in playlist:
+        print(f'{song[0]} by {song[1]} from the Album: {song[2]}')
+    # print(playlist)
 
 #
 # The following two-line "magic sequence" must be the last thing in
