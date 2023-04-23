@@ -1,9 +1,9 @@
 # 507_final_project
 
-#Spotify Song Recommendation
+# Spotify Song Recommendation
 This program recommends songs based on user input genres, artists, and songs using the Spotify API. The program uses the user input to gather data on popular songs and artists that match the user's preferences. Then it gathers audio features for these songs and creates a graph to represent the relationships between different songs. The program connects nodes based on their similarity in terms of audio features.
 
-##Prerequisites
+## Prerequisites
 The following Python packages are required for this program to run:
 
 spotipy
@@ -15,7 +15,7 @@ The spotipy package can be installed using pip:
 pip install spotipy
 The remaining packages can also be installed using pip:
 
-##Getting Started
+## Getting Started
 To use this program, follow these steps:
 
 - Clone or download the repository from GitHub.
@@ -38,15 +38,15 @@ python recommendation.py
 Follow the prompts to enter your preferred genres, artists, and songs.
 The program will recommend 15 songs based on your input.
 
-###Notes:
+### Notes:
 - The program caches data to speed up subsequent runs. Cached data is saved to a JSON file named <acronym>_data.json, where <acronym> is an acronym generated from the user's input genres, artists, and songs.
 - The program uses the cosine similarity measure to compare audio features. The audio features used are: key, mode, tempo, energy, danceability, acousticness, instrumentalness, and loudness.
 - The program connects nodes in the graph if their similarity score is above a certain threshold (0.8 by default). You can adjust the threshold by changing the value of the similarity_threshold variable in the create_graph function.
 
-##Data Structure
-###Graphs:
+## Data Structure
+### Graphs:
 - This program uses a graph data structure to represent the relationships between different songs based on their audio features. The graph is created using the NetworkX library in Python, and nodes are added to the graph to represent each song. The edges between nodes are added based on the similarity between the audio features of the corresponding songs.
 
 - The audio features used for comparison include key, mode, tempo, energy, danceability, acousticness, instrumentalness, and loudness. The similarity score between two songs is calculated using cosine similarity for continuous features and exact match for categorical features.
 
-- This graph data structure is created using the node-link format and used to find a path between two songs that maximizes the similarity between the songs on the path. The program takes as input a list of genres, artist names, and song names, and returns a list of recommended songs based on the input. The output is sorted by the similarity score of each recommended song to the input songs.
+- This graph data structure is created using the node-link format and used to find a path between two songs that maximizes the similarity between the songs on the path. In the data, the nodes contain each track's name, artist, album and id, while the links contain the weight, source and target. The program takes as input a list of genres, artist names, and song names, and returns a list of recommended songs based on the input. The output is sorted by the similarity score of each recommended song to the input songs.
